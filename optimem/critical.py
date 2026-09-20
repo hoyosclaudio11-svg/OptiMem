@@ -75,30 +75,59 @@ def _identidad(cmdline, nombre: str) -> str:
     """
     Identidad de un programa para detectar ciclos de crash.
 
-    Usa el ejecutable y el primer argumento con aspecto de ruta (el script).
-    No usa la linea completa porque los argumentos cambian entre corridas
-    legitimamente (una fecha, un id), y entonces cada corrida pareceria un
-    programa distinto y nunca se detectaria el ciclo.
+    Usa el ejecutable mas lo que define AL PROGRAMA, no lo que varia entre
+    corridas. La linea completa no sirve: los argumentos cambian legitimamente
+    (una fecha, un id) y entonces cada corrida pareceria un programa distinto y
+    el ciclo nunca se detectaria.
 
-    Devuelve "" si no hay informacion: en ese caso no se afirma nada, que es
-    mejor que afirmar de mas.
+    Hay que distinguir tres formas, y las tres importan:
+
+        python script.py        -> el script
+        python -m modulo        -> el modulo
+        python -c "codigo"      -> el codigo mismo
+
+    El tercer caso se agrego despues de ver el problema en la practica: sin el,
+    todos los `python -c` de la maquina comparten identidad (solo la ruta del
+    ejecutable) y se mezclan en un ciclo de crash que no existe. Distintos
+    scripts de una linea son programas distintos.
+
+    Devuelve "" si no hay informacion: mejor no afirmar nada que afirmar de mas.
     """
     if not cmdline:
         return ""
-    partes = [str(x) for x in cmdline]
-    if not partes:
+    partes = [str(x).strip('"') for x in cmdline]
+    if not partes or not partes[0]:
         return ""
     piezas = [partes[0]]
-    for arg in partes[1:]:
-        # El primer argumento que parezca un archivo (.py, .js, ruta) define
-        # el programa. Los demas suelen ser parametros variables.
-        a = arg.strip('"')
-        if a.lower().endswith((".py", ".pyw", ".js", ".mjs", ".cjs", ".ps1", ".bat", ".cmd")):
+
+    i = 1
+    while i < len(partes):
+        a = partes[i]
+        baja = a.lower()
+
+        # python -c "codigo": el codigo identifica al programa. Se recorta
+        # porque suele ser largo y solo interesa el principio.
+        if baja in ("-c", "--command"):
+            if i + 1 < len(partes):
+                piezas.append("[" + partes[i + 1][:70] + "]")
+            break
+
+        # python -m modulo
+        if baja in ("-m", "--module"):
+            if i + 1 < len(partes):
+                piezas.append(partes[i + 1])
+            break
+
+        if baja.endswith((".py", ".pyw", ".js", ".mjs", ".cjs", ".ps1", ".bat", ".cmd")):
             piezas.append(a)
             break
+
         if not a.startswith("-") and ("\\" in a or "/" in a):
             piezas.append(a)
             break
+
+        i += 1
+
     return " ".join(piezas).lower()
 
 
