@@ -1,7 +1,13 @@
-# Configuración local: contiene rutas de esta máquina y la lista de procesos
-# protegidos propia de cada usuario. Se regenera sola con los valores por
-# defecto en el primer arranque.
+# Configuración local: contiene rutas de esta máquina, la lista de procesos
+# protegidos propia de cada usuario, y la ruta al .env con las credenciales de
+# los avisos. Se regenera sola con los valores por defecto en el primer arranque.
 config.json
+
+# Credenciales. Nunca, bajo ningún concepto.
+.env
+.env.*
+*.env
+!*.env.example
 
 # Datos recolectados, modelos entrenados y logs. Por defecto viven fuera del
 # repo (%LOCALAPPDATA%\OptiMem), pero por si alguien apunta directorio_datos

@@ -76,6 +76,35 @@ propósito: el agente necesita la misma ventana de historia que se está
 recolectando. Si corriera aparte, armaría las features con datos distintos a los
 del entrenamiento y predeciría mal sin ningún síntoma visible.
 
+### Aviso cuando hay etiquetas suficientes
+
+Juntar las 60 etiquetas que el modelo necesita lleva horas. Un aviso atado a una
+terminal abierta se pierde justo cuando más hace falta — cuando pasaron seis
+horas y ya te olvidaste de que estabas esperando algo. Por eso el aviso lo
+dispara el recolector, que ya corre solo y sobrevive reinicios.
+
+```bash
+python optimem.py avisar           # estado de la configuración
+python optimem.py avisar --probar  # manda un mensaje de prueba
+```
+
+Las credenciales se leen de variables de entorno
+(`OPTIMEM_TELEGRAM_TOKEN` / `OPTIMEM_TELEGRAM_CHAT_ID`, o los nombres genéricos
+`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`) o de un archivo `.env` que se indica
+en `config.json`:
+
+```json
+{ "ruta_env": "C:\\ruta\\a\\tu\\.env" }
+```
+
+**Probá el aviso antes de confiar en él.** Un aviso que no se probó no es un
+aviso, es una intención. `--probar` manda un mensaje real y te dice si Telegram
+lo rechazó y por qué.
+
+El token nunca se registra en el log ni se muestra por pantalla, y `config.json`
+y los `.env` están en `.gitignore`: el proyecto es público y no lleva ninguna
+credencial adentro.
+
 ### Que arranque solo
 
 `recolectar_oculto.vbs` lanza el recolector sin ventana y lo relanza si se muere.
@@ -289,6 +318,7 @@ optimem/
   trainer.py           entrenamiento y evaluación
   agent.py             el agente de decisión
   calibracion.py       cuánto cuesta un trim, medido
+  notificar.py         avisos por Telegram
   server.py            panel web
   static/index.html    el panel
 validacion/            los experimentos que decidieron el diseño

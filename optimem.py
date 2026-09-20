@@ -433,6 +433,50 @@ def _tabla_paging(con, corte) -> None:
               f"({delta * 4096 / 1024**3:.2f} GB en {dt_min / 60:.1f} h)")
 
 
+def cmd_avisar(args) -> int:
+    from optimem import db, notificar
+
+    cfg = cfgmod.cargar()
+    con = db.inicializar(cfg.ruta_db)
+
+    if args.probar:
+        print("Mandando un mensaje de prueba por Telegram...")
+        ok, msg = notificar.probar(cfg, con)
+        print(f"\n  {msg}")
+        if ok:
+            print("\n  Si te llego al telefono, el aviso de las etiquetas va a funcionar.")
+            print("  Si NO te llego, revisá el chat_id: el log dice el motivo exacto.")
+        return 0 if ok else 1
+
+    if args.ahora:
+        print("Mandando el aviso real de umbral...")
+        ok = notificar.avisar_si_corresponde(cfg, con, forzar=True)
+        print("  enviado" if ok else "  no se pudo enviar")
+        return 0 if ok else 1
+
+    cred = notificar.credenciales(cfg)
+    estado = "configurado" if cred else "SIN configurar"
+    objetivo = cfg.min_muestras_entrenar
+    n = con.execute("SELECT COUNT(*) n FROM resultados WHERE etiqueta IS NOT NULL").fetchone()["n"]
+    print("Avisos por Telegram")
+    print("=" * 60)
+    print(f"  estado        : {estado}")
+    print(f"  archivo .env  : {cfg.ruta_env or '(no configurado: solo variables de entorno)'}")
+    print(f"  avisos activos: {'si' if cfg.avisos_activos else 'no'}")
+    print(f"  etiquetas     : {n} de {objetivo}")
+    if n < objetivo:
+        print(f"  faltan        : {objetivo - n} para que dispare el aviso")
+    else:
+        print(f"  el umbral ya se cruzó; se avisa en el proximo ciclo del recolector")
+    if cred:
+        print(f"\n  El token no se muestra nunca, ni acá ni en el log.")
+    else:
+        print(f"\n  Para configurarlo, poné en config.json la ruta de tu .env:")
+        print(f'      "ruta_env": "C:\\\\ruta\\\\a\\\\.env"')
+        print(f"  o definí las variables OPTIMEM_TELEGRAM_TOKEN y OPTIMEM_TELEGRAM_CHAT_ID.")
+    return 0
+
+
 def cmd_panel(args) -> int:
     from optimem import server
 
@@ -532,6 +576,12 @@ def main(argv=None) -> int:
     s.add_argument("--desde-horas", type=float, metavar="H",
                    help="fijar el corte a mano, tantas horas atras")
     s.set_defaults(fn=cmd_informe)
+
+    s = sub.add_parser("avisar", help="avisos por Telegram")
+    s.add_argument("--probar", action="store_true",
+                   help="mandar un mensaje de prueba (hacelo: un aviso sin probar es una intencion)")
+    s.add_argument("--ahora", action="store_true", help="mandar el aviso de umbral ya")
+    s.set_defaults(fn=cmd_avisar)
 
     s = sub.add_parser("panel", help="panel web")
     s.add_argument("--puerto", type=int)

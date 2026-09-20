@@ -52,6 +52,7 @@ class Recolector:
         self._t_limpieza = 0.0
         self._t_agente = 0.0
         self._t_base = 0.0
+        self._t_avisos = 0.0
 
         # El agente vive en este mismo proceso a proposito: necesita la misma
         # ventana de historia que estamos recolectando. Si corriera aparte,
@@ -351,6 +352,26 @@ class Recolector:
                                 detalle=f"agente: {type(e).__name__}: {e}")
 
     # ------------------------------------------------------------------
+    def _revisar_avisos(self) -> None:
+        """
+        Avisa por Telegram cuando ya hay etiquetas suficientes para entrenar.
+
+        Se revisa seguido y no una vez por hora: cruzar el umbral es el evento
+        que el usuario esta esperando, y no tiene sentido que se entere hasta
+        una hora despues. Es idempotente, asi que revisar de mas no molesta.
+        """
+        if not self.cfg.avisos_activos:
+            return
+        try:
+            from . import notificar
+            notificar.log = log
+            if notificar.avisar_si_corresponde(self.cfg, self.con):
+                log.info("Aviso de umbral enviado por Telegram")
+        except Exception as e:
+            # Un aviso que falla no puede tumbar una recoleccion de horas.
+            log.warning("No se pudo revisar el aviso: %s: %s", type(e).__name__, e)
+
+    # ------------------------------------------------------------------
     def ciclo_limpieza(self) -> None:
         b = db.limpiar_viejos(self.con, self.cfg.retencion_dias)
         if any(b.values()):
@@ -398,6 +419,9 @@ class Recolector:
                     if ahora - self._t_sonda >= 30:
                         self._t_sonda = ahora
                         self._supervisar_sonda()
+                    if ahora - self._t_avisos >= 120:
+                        self._t_avisos = ahora
+                        self._revisar_avisos()
                     if ahora - self._t_base >= 60:
                         self._t_base = ahora
                         # Se intenta seguido y no una vez por hora: hasta que

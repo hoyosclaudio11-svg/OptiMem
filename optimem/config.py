@@ -117,6 +117,16 @@ class Config:
     reanimar: dict = field(default_factory=dict)
     auto_reanimar: bool = False
 
+    # --- avisos ---
+    # El recolector avisa por Telegram al cruzar min_muestras_entrenar. Va en
+    # el recolector y no en un temporizador aparte porque juntar las etiquetas
+    # lleva horas: un aviso atado a una terminal abierta se pierde justo
+    # cuando mas hace falta.
+    avisos_activos: bool = True
+    # Archivo .env del que leer las credenciales. Vacio = solo variables de
+    # entorno. Las credenciales NUNCA van en config.json ni en el repositorio.
+    ruta_env: str = ""
+
     # --- panel ---
     host: str = "127.0.0.1"
     puerto: int = 5215
