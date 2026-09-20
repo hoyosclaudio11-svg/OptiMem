@@ -1,0 +1,35 @@
+# Configuración local: contiene rutas de esta máquina y la lista de procesos
+# protegidos propia de cada usuario. Se regenera sola con los valores por
+# defecto en el primer arranque.
+config.json
+
+# Datos recolectados, modelos entrenados y logs. Por defecto viven fuera del
+# repo (%LOCALAPPDATA%\OptiMem), pero por si alguien apunta directorio_datos
+# acá adentro.
+datos/
+modelos/
+*.db
+*.db-wal
+*.db-shm
+*.log
+_sonda_cache.bin
+_sonda_disco.bin
+
+# Caché de herramientas
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Capturas de trabajo
+captura_panel.png
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*~

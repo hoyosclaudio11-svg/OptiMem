@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OptiMem</title>
+<style>
+/* Tokens. Los valores oscuros son pasos elegidos para la superficie oscura,
+   no un volteo automatico de los claros. Paleta validada con el script del
+   sistema de diseño: CVD dE 26.8, vision normal 31.8, contraste >=3:1. */
+:root {
+  color-scheme: dark;
+  --plano:        #0d0d0d;
+  --superficie:   #1a1a19;
+  --sup-2:        #212120;
+  --tinta:        #ffffff;
+  --tinta-2:      #c3c2b7;
+  --tinta-muda:   #898781;
+  --grilla:       #2c2c2a;
+  --eje:          #383835;
+  --borde:        rgba(255,255,255,0.10);
+  --serie-1:      #3987e5;
+  --serie-2:      #d95926;
+  --bueno:        #0ca30c;
+  --aviso:        #fab219;
+  --serio:        #ec835a;
+  --critico:      #d03b3b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--plano); color: var(--tinta);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 20px 16px 64px; }
+
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+         margin-bottom: 4px; }
+h1 { font-size: 20px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+.sub { color: var(--tinta-muda); font-size: 13px; }
+.crece { flex: 1; }
+
+.pastilla { display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; font-size: 12px;
+  border: 1px solid var(--borde); color: var(--tinta-2); background: var(--sup-2); }
+.punto { width: 8px; height: 8px; border-radius: 50%; background: var(--tinta-muda); }
+.punto.vivo { background: var(--bueno); }
+.punto.muerto { background: var(--critico); }
+
+.barra-controles { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin: 16px 0 20px; }
+button { font: inherit; font-size: 13px; color: var(--tinta-2);
+  background: var(--sup-2); border: 1px solid var(--borde);
+  border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+button:hover:not(:disabled) { color: var(--tinta); border-color: var(--tinta-muda); }
+button:disabled { opacity: 0.45; cursor: default; }
+button.on { background: var(--serie-1); border-color: var(--serie-1); color: #fff; }
+
+.tarjetas { display: grid; gap: 12px; margin-bottom: 22px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.tarjeta { background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 10px; padding: 14px 16px; }
+.tarjeta .rotulo { color: var(--tinta-muda); font-size: 12px; margin-bottom: 6px; }
+.tarjeta .valor { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.tarjeta .nota { color: var(--tinta-muda); font-size: 12px; margin-top: 4px; }
+.tarjeta .valor.chico { font-size: 19px; }
+
+section { background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
+section > h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
+section > .desc { color: var(--tinta-muda); font-size: 12.5px; margin-bottom: 12px; }
+
+.leyenda { display: flex; gap: 16px; flex-wrap: wrap; margin: 0 0 8px;
+  font-size: 12.5px; color: var(--tinta-2); }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.muestra { width: 14px; height: 2px; border-radius: 1px; }
+
+svg { display: block; width: 100%; overflow: visible; }
+.eje-txt { fill: var(--tinta-muda); font-size: 11px; font-variant-numeric: tabular-nums; }
+.grilla { stroke: var(--grilla); stroke-width: 1; }
+.eje { stroke: var(--eje); stroke-width: 1; }
+.corte { stroke: var(--aviso); stroke-width: 1; }
+.corte-txt { fill: var(--aviso); font-size: 11px; }
+
+.tabla-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--tinta-muda); font-weight: 500;
+  font-size: 12px; padding: 7px 10px; border-bottom: 1px solid var(--borde); }
+td { padding: 6px 10px; border-bottom: 1px solid var(--grilla);
+  color: var(--tinta-2); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--tinta); }
+tbody tr:hover td { background: var(--sup-2); color: var(--tinta); }
+tbody tr:last-child td { border-bottom: none; }
+
+.etiqueta { display: inline-block; padding: 1px 7px; border-radius: 5px;
+  font-size: 11.5px; border: 1px solid var(--borde); color: var(--tinta-2); }
+.etiqueta.bueno   { color: var(--bueno);   border-color: var(--bueno); }
+.etiqueta.malo    { color: var(--critico); border-color: var(--critico); }
+.etiqueta.aviso   { color: var(--aviso);   border-color: var(--aviso); }
+.etiqueta.gris    { color: var(--tinta-muda); }
+
+#tip { position: fixed; pointer-events: none; background: var(--sup-2);
+  border: 1px solid var(--borde); border-radius: 7px; padding: 8px 10px;
+  font-size: 12.5px; color: var(--tinta); z-index: 50; display: none;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5); max-width: 280px; }
+#tip .k { color: var(--tinta-muda); }
+#tip .fila { display: flex; justify-content: space-between; gap: 14px;
+  font-variant-numeric: tabular-nums; }
+
+.oculto { display: none; }
+.cargando { opacity: 0.55; transition: opacity .15s; }
+.vacio { color: var(--tinta-muda); font-size: 13px; padding: 18px 0; }
+
+.rejilla { display: grid; gap: 18px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .rejilla.dos { grid-template-columns: 1fr 1fr; } }
+
+ul.lista { margin: 0; padding-left: 18px; color: var(--tinta-2); font-size: 13px; }
+ul.lista li { margin-bottom: 5px; }
+code { background: var(--sup-2); padding: 1px 6px; border-radius: 4px;
+  font-size: 12.5px; color: var(--tinta-2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>OptiMem</h1>
+    <span class="sub" id="sub-datos"></span>
+    <span class="crece"></span>
+    <span class="pastilla"><span class="punto" id="latido"></span><span id="txt-latido">conectando</span></span>
+    <span class="pastilla" id="pastilla-modo">&mdash;</span>
+  </header>
+
+  <div class="barra-controles">
+    <button data-modo="observacion">Observación</button>
+    <button data-modo="aprendizaje">Aprendizaje</button>
+    <button data-modo="activo">Activo</button>
+    <span class="crece"></span>
+    <button id="btn-calibrar">Calibrar costo</button>
+    <button id="btn-entrenar">Entrenar modelo</button>
+  </div>
+
+  <div class="tarjetas" id="tarjetas"></div>
+
+  <section>
+    <h2>Índice de respuesta</h2>
+    <div class="desc" id="desc-indice">La métrica del proyecto. 1.00 = igual que la línea de base; menos es mejor.</div>
+    <div class="leyenda" id="leyenda-indice"></div>
+    <div id="graf-indice"></div>
+    <div style="margin-top:10px">
+      <button class="btn-tabla" data-tabla="indice">Ver tabla</button>
+    </div>
+    <div class="tabla-wrap oculto" id="tabla-indice"></div>
+  </section>
+
+  <section>
+    <h2>Presión de memoria</h2>
+    <div class="desc">Cuánto de la RAM y del límite de commit está en uso. El agente solo actúa cuando esto sube.</div>
+    <div class="leyenda">
+      <span><i class="muestra" style="background:var(--serie-1)"></i>RAM en uso</span>
+      <span><i class="muestra" style="background:var(--serie-2)"></i>commit</span>
+    </div>
+    <div id="graf-memoria"></div>
+    <div style="margin-top:10px">
+      <button class="btn-tabla" data-tabla="memoria">Ver tabla</button>
+    </div>
+    <div class="tabla-wrap oculto" id="tabla-memoria"></div>
+  </section>
+
+  <div class="rejilla dos">
+    <section>
+      <h2>Aprendizaje</h2>
+      <div class="desc">El modelo aprende de los trims ya evaluados.</div>
+      <div id="aprendizaje"></div>
+    </section>
+    <section>
+      <h2>Procesos críticos</h2>
+      <div class="desc">Ninguno de estos se toca. Es la protección contra cierres indeseados.</div>
+      <div id="criticos"></div>
+    </section>
+  </div>
+
+  <section>
+    <h2>Decisiones del agente</h2>
+    <div class="desc">Cada acción con su resultado medido. Una etiqueta roja es un trim que salió mal.</div>
+    <div class="tabla-wrap" id="tabla-acciones"></div>
+  </section>
+
+  <section>
+    <h2>Trims frenados por el modelo</h2>
+    <div class="desc">Swaps innecesarios que se evitaron: el modelo dijo que iban a salir mal y no se hicieron.</div>
+    <div class="tabla-wrap" id="tabla-frenadas"></div>
+  </section>
+
+  <section>
+    <h2>Procesos candidatos</h2>
+    <div class="desc">Los más grandes que sí se pueden tocar, con su categoría y su motivo.</div>
+    <div class="tabla-wrap" id="tabla-candidatos"></div>
+  </section>
+
+  <section>
+    <h2>Eventos</h2>
+    <div class="desc">Solo lo que amerita: patrones de crash, acciones bloqueadas, errores.</div>
+    <div class="tabla-wrap" id="tabla-eventos"></div>
+  </section>
+
+</div>
+<div id="tip"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const gb = (b) => b == null ? "?" : (b / 1073741824).toFixed(2) + " GB";
+const mb = (b) => b == null ? "?" : (b / 1048576).toFixed(0) + " MB";
+const pct = (x) => x == null ? "?" : (x * 100).toFixed(0) + "%";
+const hora = (t) => { const d = new Date(t * 1000);
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0"); };
+const fechaHora = (t) => { const d = new Date(t * 1000);
+  return d.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}) + " " + hora(t); };
+const num = (x) => x == null ? "—" : Math.round(x).toLocaleString("es-AR");
+
+let minutos = 180;
+let ultimo = null;
+
+/* ------------------------------------------------------------------
+   Gráfico de líneas. SVG a mano, sin dependencias.
+   El alto incluye la banda del eje x: si no, las etiquetas quedan
+   cortadas y la tarjeta saca un scroll interno horrible.
+   ------------------------------------------------------------------ */
+function grafico(cont, series, opciones) {
+  const o = Object.assign({ ancho: 900, alto: 200, bandaEje: 26, pad: 38,
+                            formato: (v)=>v.toFixed(2), yMin: null, yMax: null,
+                            referencia: null, corte: null }, opciones || {});
+  const nodo = $(cont);
+  if (!series.length || !series[0].puntos.length) {
+    nodo.innerHTML = '<div class="vacio">Sin datos todavía. Deja el recolector corriendo.</div>';
+    return;
+  }
+  const W = o.ancho, H = o.alto, B = o.bandaEje;
+  const anchoPlot0 = W - o.pad * 2, altoPlot = H - B - 10;
+
+  let todos = [];
+  series.forEach(s => s.puntos.forEach(p => { if (p.y != null) todos.push(p.y); }));
+  if (o.referencia != null) todos.push(o.referencia);
+  if (!todos.length) { nodo.innerHTML = '<div class="vacio">Sin datos.</div>'; return; }
+  let y0 = o.yMin != null ? o.yMin : Math.min(...todos);
+  let y1 = o.yMax != null ? o.yMax : Math.max(...todos);
+  if (y1 - y0 < 1e-9) { y0 -= 0.5; y1 += 0.5; }
+  // El margen solo se aplica si el rango lo puso el llamador. Si vino con
+  // yMin/yMax explicitos (un porcentaje, por ejemplo) hay que respetarlos:
+  // un grafico de porcentajes que muestra -12% o 112% es sencillamente falso.
+  if (o.yMin == null && o.yMax == null) {
+    const mg = (y1 - y0) * 0.12; y0 -= mg; y1 += mg;
+  }
+
+  // El margen izquierdo se calcula a partir de la etiqueta mas ancha. Con un
+  // valor fijo, un numero de cinco cifras (282.29) se sale del svg y queda
+  // cortado; con la linea de base puesta las etiquetas son "1.05" y sobra
+  // espacio. Se adapta a los dos casos.
+  const etiquetasY = [];
+  for (let i = 0; i <= 4; i++) etiquetasY.push(o.formato(y0 + (y1 - y0) * i / 4));
+  const anchoEtiqueta = Math.max(...etiquetasY.map(t => String(t).length)) * 6.4;
+  const P = Math.max(o.pad, anchoEtiqueta + 14);
+  const anchoPlot = W - P - o.pad;
+
+  const ts = series[0].puntos.map(p => p.x);
+  let t0 = Math.min(...ts), t1 = Math.max(...ts);
+  if (t1 - t0 < 1) t1 = t0 + 1;
+
+  const X = (t) => P + (t - t0) / (t1 - t0) * anchoPlot;
+  const Y = (v) => 10 + altoPlot - (v - y0) / (y1 - y0) * altoPlot;
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${o.aria || 'gráfico de líneas'}">`;
+  // grilla: hairline solida, recesiva. Nunca punteada.
+  for (let i = 0; i <= 4; i++) {
+    const v = y0 + (y1 - y0) * i / 4, y = Y(v);
+    s += `<line class="grilla" x1="${P}" y1="${y}" x2="${W - o.pad}" y2="${y}"/>`;
+    s += `<text class="eje-txt" x="${P - 7}" y="${y + 4}" text-anchor="end">${o.formato(v)}</text>`;
+  }
+  if (o.referencia != null && o.referencia >= y0 && o.referencia <= y1) {
+    const y = Y(o.referencia);
+    s += `<line class="eje" x1="${P}" y1="${y}" x2="${W - o.pad}" y2="${y}"/>`;
+  }
+  for (let i = 0; i <= 3; i++) {
+    const t = t0 + (t1 - t0) * i / 3;
+    const anc = i === 0 ? "start" : (i === 3 ? "end" : "middle");
+    s += `<text class="eje-txt" x="${X(t)}" y="${H - 6}" text-anchor="${anc}">${hora(t)}</text>`;
+  }
+  if (o.corte && o.corte >= t0 && o.corte <= t1) {
+    const x = X(o.corte);
+    s += `<line class="corte" x1="${x}" y1="10" x2="${x}" y2="${10 + altoPlot}"/>`;
+    const anc = o.corte > (t0 + t1) / 2 ? "end" : "start";
+    const dx = anc === "end" ? -6 : 6;
+    s += `<text class="corte-txt" x="${x + dx}" y="20" text-anchor="${anc}">el agente empezó a actuar</text>`;
+  }
+  s += `<line class="eje" x1="${P}" y1="${10 + altoPlot}" x2="${W - o.pad}" y2="${10 + altoPlot}"/>`;
+
+  series.forEach(serie => {
+    let d = "", abierto = false;
+    serie.puntos.forEach(p => {
+      if (p.y == null) { abierto = false; return; }
+      d += (abierto ? " L" : " M") + X(p.x).toFixed(1) + " " + Y(p.y).toFixed(1);
+      abierto = true;
+    });
+    if (d) s += `<path d="${d}" fill="none" stroke="${serie.color}" stroke-width="2"
+                    stroke-linejoin="round" stroke-linecap="round"/>`;
+    const ult = serie.puntos.filter(p => p.y != null).slice(-1)[0];
+    if (ult) s += `<circle cx="${X(ult.x)}" cy="${Y(ult.y)}" r="4" fill="${serie.color}"
+                    stroke="var(--superficie)" stroke-width="2"/>`;
+  });
+
+  s += `<rect id="hit-${cont}" x="${P}" y="10" width="${anchoPlot}" height="${altoPlot}"
+              fill="transparent" style="cursor:crosshair"/>`;
+  s += `<line id="cross-${cont}" class="eje" x1="0" y1="10" x2="0" y2="${10 + altoPlot}"
+              style="display:none"/>`;
+  s += `</svg>`;
+  nodo.innerHTML = s;
+
+  // Crosshair + tooltip: un grafico HTML es interactivo por defecto.
+  const hit = $(`hit-${cont}`), cross = $(`cross-${cont}`), tip = $("tip");
+  const svg = nodo.querySelector("svg");
+  hit.addEventListener("mousemove", (ev) => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) / r.width * W;
+    const t = t0 + (px - P) / anchoPlot * (t1 - t0);
+    let mejor = null, dist = Infinity;
+    series.forEach(serie => serie.puntos.forEach(p => {
+      if (p.y == null) return;
+      const dd = Math.abs(p.x - t);
+      if (dd < dist) { dist = dd; mejor = { p, serie }; }
+    }));
+    if (!mejor) return;
+    const x = X(mejor.p.x);
+    cross.setAttribute("x1", x); cross.setAttribute("x2", x);
+    cross.style.display = "";
+    let html = `<div class="k">${fechaHora(mejor.p.x)}</div>`;
+    series.forEach(serie => {
+      const p = serie.puntos.reduce((a, b) =>
+        Math.abs(b.x - mejor.p.x) < Math.abs(a.x - mejor.p.x) ? b : a);
+      if (p.y == null) return;
+      html += `<div class="fila"><span class="k">${serie.nombre}</span>
+               <span>${o.formato(p.y)}</span></div>`;
+    });
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.min(ev.clientX + 14, innerWidth - tw - 10) + "px";
+    tip.style.top = Math.max(10, ev.clientY - th - 12) + "px";
+  });
+  hit.addEventListener("mouseleave", () => {
+    cross.style.display = "none"; tip.style.display = "none";
+  });
+}
+
+/* Vista de tabla: todo grafico tiene que tener su equivalente legible. */
+function tablaDeSeries(series, formato) {
+  const puntos = series[0].puntos;
+  let h = `<table><thead><tr><th>Hora</th>`;
+  series.forEach(s => h += `<th style="text-align:right">${s.nombre}</th>`);
+  h += `</tr></thead><tbody>`;
+  puntos.slice(-200).reverse().forEach((p, i) => {
+    h += `<tr><td>${fechaHora(p.x)}</td>`;
+    series.forEach(s => {
+      const q = s.puntos.find(z => z.x === p.x);
+      h += `<td class="num">${q && q.y != null ? formato(q.y) : "—"}</td>`;
+    });
+    h += `</tr>`;
+  });
+  return h + `</tbody></table>`;
+}
+
+/* ------------------------------------------------------------------
+   Render
+   ------------------------------------------------------------------ */
+function tarjetas(d) {
+  const m = d.memoria || {}, s = d.sonda || {}, a = d.agente || {}, ap = d.aprendizaje || {};
+  const idx = s.indice;
+  const conBase = s.linea_base != null;
+  // Sin linea de base el indice es la suma cruda de milisegundos (~100), no
+  // una razon. Colorearlo con los umbrales de la razon lo pintaria de rojo
+  // permanente: una alarma sobre un numero que todavia no significa nada.
+  const claseIdx = (idx == null || !conBase) ? ""
+    : (idx > 1.15 ? "critico" : idx > 1.02 ? "aviso" : "bueno");
+  const t = [];
+
+  t.push(`<div class="tarjeta"><div class="rotulo">RAM libre</div>
+    <div class="valor">${gb(m.disponible)}</div>
+    <div class="nota">de ${gb(m.total)} · en uso ${pct(m.presion_ram)}</div></div>`);
+
+  t.push(`<div class="tarjeta"><div class="rotulo">Commit</div>
+    <div class="valor">${pct(m.presion_commit)}</div>
+    <div class="nota">${gb(m.commit_total)} de ${gb(m.commit_limite)}</div></div>`);
+
+  t.push(`<div class="tarjeta"><div class="rotulo">Índice de respuesta</div>
+    <div class="valor" style="color:var(--${claseIdx || "tinta"})">
+      ${idx == null ? "—" : idx.toFixed(2)}</div>
+    <div class="nota">${conBase
+      ? "línea de base fijada " + (s.linea_base_ts ? fechaHora(s.linea_base_ts) : "")
+      : "sin línea de base todavía"}</div></div>`);
+
+  t.push(`<div class="tarjeta"><div class="rotulo">Acciones esta hora</div>
+    <div class="valor chico">${a.acciones_1h || 0} <span style="font-size:14px;color:var(--tinta-muda)">
+      / ${d.cfg.max_acciones_por_hora}</span></div>
+    <div class="nota">${mb(a.liberado_1h)} liberados · ${a.exploraciones_1h || 0} de exploración</div></div>`);
+
+  const faltan = Math.max(0, d.cfg.min_muestras_entrenar - (ap.listas_para_entrenar || 0));
+  t.push(`<div class="tarjeta"><div class="rotulo">Trims evaluados</div>
+    <div class="valor">${ap.listas_para_entrenar || 0}</div>
+    <div class="nota">${faltan ? `faltan ${faltan} para poder entrenar`
+      : (d.modelo ? "modelo entrenado" : "listo para entrenar")}
+      ${ap.descartadas ? ` · ${ap.descartadas} descartados` : ""}</div></div>`);
+
+  const cal = d.calibracion;
+  t.push(`<div class="tarjeta"><div class="rotulo">Costo de un trim</div>
+    <div class="valor chico">${cal ? cal.ms_por_mb.toFixed(3) + " ms/MB" : "sin calibrar"}</div>
+    <div class="nota">${cal ? `un proceso de 1 GB: ${(cal.ms_por_mb * 1024).toFixed(0)} ms de pausa`
+      : "corré «Calibrar costo»"}</div></div>`);
+
+  $("tarjetas").innerHTML = t.join("");
+}
+
+function aprendizaje(d) {
+  const ap = d.aprendizaje || {}, mod = d.modelo;
+  const total = (ap.buenas || 0) + (ap.malas || 0);
+  const pctMalo = total ? (ap.malas / total * 100) : 0;
+  let h = `<table><tbody>`;
+  h += `<tr><td>Trims que salieron bien</td><td class="num">${ap.buenas || 0}</td></tr>`;
+  h += `<tr><td>Trims que causaron thrash</td><td class="num" style="color:var(--critico)">${ap.malas || 0}</td></tr>`;
+  h += `<tr><td>Descartados por ambiguos</td><td class="num">${ap.descartadas || 0}</td></tr>`;
+  if (total) h += `<tr><td>Tasa de thrash</td><td class="num">${pctMalo.toFixed(1)}%</td></tr>`;
+  h += `</tbody></table>`;
+
+  if (total && pctMalo > 50) {
+    h += `<div class="nota" style="color:var(--tinta-muda);margin-top:10px;font-size:12.5px">
+      Más de la mitad de los trims exploratorios causaron re-lecturas. Eso confirma que
+      elegir bien a quién trimear importa, y que hay margen real para el modelo.</div>`;
+  }
+  if (mod) {
+    const met = mod.metricas || {};
+    h += `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--grilla)">
+      <div class="rotulo" style="color:var(--tinta-muda);font-size:12px;margin-bottom:8px">
+        Modelo activo: ${mod.algoritmo} · ${mod.version}</div>
+      <table><tbody>
+      <tr><td>Umbral de decisión</td><td class="num">${mod.umbral != null ? mod.umbral.toFixed(2) : "—"}</td></tr>
+      <tr><td>AUC</td><td class="num">${met.auc != null ? met.auc.toFixed(3) : "—"}</td></tr>
+      <tr><td>Precisión / recall</td><td class="num">${
+        met.precision != null ? met.precision.toFixed(2) : "—"} / ${
+        met.recall != null ? met.recall.toFixed(2) : "—"}</td></tr>
+      <tr><td>Trims malos frenados</td><td class="num">${
+        met.linea_base ? met.linea_base.malos_evitados + "/" + met.linea_base.malos_en_test : "—"}</td></tr>
+      </tbody></table></div>`;
+  }
+  $("aprendizaje").innerHTML = h;
+}
+
+function criticos(d) {
+  const cand = d.candidatos || [];
+  const conteo = {};
+  cand.forEach(c => { conteo[c.categoria] = (conteo[c.categoria] || 0) + 1; });
+  const nombres = { nucleo: "núcleo de Windows", protegido: "tu lista de protegidos",
+                    foco: "ventana activa", visible: "app con ventana",
+                    vigilado: "vigilado", libre: "libre (se puede tocar)" };
+  let h = `<table><tbody>`;
+  ["nucleo","protegido","foco","visible","vigilado","libre"].forEach(k => {
+    if (!conteo[k]) return;
+    const color = k === "libre" ? "var(--bueno)" :
+                  (k === "vigilado" ? "var(--aviso)" : "var(--tinta-muda)");
+    h += `<tr><td>${nombres[k]}</td>
+      <td class="num" style="color:${color}">${conteo[k]}</td></tr>`;
+  });
+  h += `</tbody></table>`;
+  const ev = (d.eventos || []).filter(e => e.tipo === "muerte_proceso");
+  if (ev.length) {
+    h += `<div style="margin-top:14px"><div class="rotulo" style="color:var(--tinta-muda);
+      font-size:12px;margin-bottom:6px">Alertas de cierre</div><ul class="lista">`;
+    ev.slice(0, 4).forEach(e => {
+      h += `<li><span class="etiqueta ${e.severidad === "grave" ? "malo" : "aviso"}">${
+        e.severidad}</span> ${e.nombre || ""} — ${(e.detalle || "").slice(0, 110)}</li>`;
+    });
+    h += `</ul></div>`;
+  } else {
+    h += `<div class="nota" style="color:var(--tinta-muda);margin-top:12px;font-size:12.5px">
+      Sin patrones de crash detectados. Las muertes sueltas de procesos de un solo uso
+      no se reportan: son normales y avisar por cada una sería ruido.</div>`;
+  }
+  $("criticos").innerHTML = h;
+}
+
+function tablaAcciones(d) {
+  const a = d.acciones || [];
+  if (!a.length) { $("tabla-acciones").innerHTML =
+    '<div class="vacio">Todavía no hubo acciones.</div>'; return; }
+  let h = `<table><thead><tr><th>Hora</th><th>Proceso</th><th>Tipo</th>
+    <th style="text-align:right">Liberado</th><th style="text-align:right">P(thrash)</th>
+    <th>Resultado</th></tr></thead><tbody>`;
+  a.forEach(x => {
+    let res = '<span class="etiqueta gris">sin evaluar</span>';
+    if (x.etiqueta === 1) res = `<span class="etiqueta malo">thrash ${x.reincidencia ?
+      x.reincidencia.toFixed(1) + "x" : ""}</span>`;
+    else if (x.etiqueta === 0) res = `<span class="etiqueta bueno">ok ${x.reincidencia ?
+      x.reincidencia.toFixed(1) + "x" : ""}</span>`;
+    else if (x.tipo === "trim") res = '<span class="etiqueta gris">descartado</span>';
+    const tipo = x.tipo === "trim" ? "trim" : `prioridad ${x.nivel || ""}`;
+    h += `<tr><td>${fechaHora(x.ts)}</td><td>${(x.nombre || "").slice(0, 26)}</td>
+      <td>${tipo} <span class="etiqueta gris">${x.autor || ""}</span></td>
+      <td class="num">${x.liberado ? mb(x.liberado) : "—"}</td>
+      <td class="num">${x.p_thrash != null ? x.p_thrash.toFixed(2) : "—"}</td>
+      <td>${res}</td></tr>`;
+  });
+  $("tabla-acciones").innerHTML = h + "</tbody></table>";
+}
+
+function tablaFrenadas(d) {
+  const f = d.frenadas || [];
+  if (!f.length) { $("tabla-frenadas").innerHTML =
+    '<div class="vacio">Todavía no se frenó ninguna. Aparecen cuando el modelo está en modo activo.</div>';
+    return; }
+  let h = `<table><thead><tr><th>Hora</th><th>Proceso</th><th>Por qué</th></tr></thead><tbody>`;
+  f.forEach(x => { h += `<tr><td>${fechaHora(x.ts)}</td>
+    <td>${(x.nombre || "").slice(0, 26)}</td><td>${x.detalle || ""}</td></tr>`; });
+  $("tabla-frenadas").innerHTML = h + "</tbody></table>";
+}
+
+function tablaCandidatos(d) {
+  const c = d.candidatos || [];
+  if (!c.length) { $("tabla-candidatos").innerHTML = '<div class="vacio">Sin datos.</div>'; return; }
+  let h = `<table><thead><tr><th>Proceso</th><th>pid</th><th style="text-align:right">RAM</th>
+    <th>Categoría</th><th>Por qué no se toca</th></tr></thead><tbody>`;
+  c.forEach(x => {
+    const libre = x.categoria === "libre";
+    h += `<tr><td>${(x.nombre || "").slice(0, 30)}</td><td class="num">${x.pid}</td>
+      <td class="num">${mb(x.ws)}</td>
+      <td><span class="etiqueta ${libre ? "bueno" : "gris"}">${x.categoria}</span></td>
+      <td>${libre ? "—" : (x.motivo || "")}</td></tr>`;
+  });
+  $("tabla-candidatos").innerHTML = h + "</tbody></table>";
+}
+
+function tablaEventos(d) {
+  const e = d.eventos || [];
+  if (!e.length) { $("tabla-eventos").innerHTML =
+    '<div class="vacio">Sin eventos que reportar.</div>'; return; }
+  let h = `<table><thead><tr><th>Hora</th><th>Severidad</th><th>Tipo</th>
+    <th>Detalle</th></tr></thead><tbody>`;
+  e.forEach(x => {
+    const cls = x.severidad === "grave" ? "malo" : x.severidad === "aviso" ? "aviso" : "gris";
+    h += `<tr><td>${fechaHora(x.ts)}</td>
+      <td><span class="etiqueta ${cls}">${x.severidad}</span></td>
+      <td>${x.tipo}</td><td>${(x.detalle || "").slice(0, 140)}</td></tr>`;
+  });
+  $("tabla-eventos").innerHTML = h + "</tbody></table>";
+}
+
+function pintar(d) {
+  const m = d.memoria || {};
+  $("sub-datos").textContent = d.cfg.dir_datos;
+  $("pastilla-modo").textContent = "modo " + d.cfg.modo +
+    (d.cfg.agente_activo ? "" : " (agente apagado)");
+  document.querySelectorAll("[data-modo]").forEach(b =>
+    b.classList.toggle("on", b.dataset.modo === d.cfg.modo));
+  $("latido").className = "punto vivo";
+  $("txt-latido").textContent = "en vivo";
+  tarjetas(d); aprendizaje(d); criticos(d);
+  tablaAcciones(d); tablaFrenadas(d); tablaCandidatos(d); tablaEventos(d);
+}
+
+async function traerSerie() {
+  const r = await fetch(`/api/serie?minutos=${minutos}`);
+  const s = await r.json();
+  const crudos = s.sondas.map(p => ({ x: p.ts, y: p.indice })).filter(p => p.y != null && p.y > 0);
+  const hayBase = ultimo && ultimo.sonda && ultimo.sonda.linea_base != null;
+  // Mediana movil: la lectura cruda salta mucho porque el componente de CPU
+  // sigue la carga de la maquina, que cambia todo el tiempo. La tendencia es
+  // lo que interesa, y es tambien lo que usa el informe (mediana, no
+  // promedio: una corrida mala no debe arrastrar la conclusion).
+  const med = [];
+  const VENTANA = 9;
+  for (let i = 0; i < crudos.length; i++) {
+    const trozo = crudos.slice(Math.max(0, i - VENTANA + 1), i + 1)
+      .map(p => p.y).sort((a, b) => a - b);
+    med.push({ x: crudos[i].x, y: trozo[Math.floor(trozo.length / 2)] });
+  }
+  grafico("graf-indice", [
+    { nombre: "lectura", color: "var(--tinta-muda)", puntos: crudos },
+    { nombre: "tendencia (mediana)", color: "var(--serie-1)", puntos: med },
+  ],
+    // Sin linea de base no hay razon que mostrar, asi que las etiquetas van
+    // en milisegundos enteros en vez de un "1.05" que no significa nada.
+    { formato: hayBase ? (v) => v.toFixed(2) : (v) => v.toFixed(0) + " ms",
+      referencia: hayBase ? 1.0 : null,
+      corte: s.corte, aria: "índice de respuesta en el tiempo" });
+  $("desc-indice").textContent = hayBase
+    ? "La métrica del proyecto. 1.00 = igual que la línea de base; menos es mejor. "
+      + "La lectura salta porque incluye la carga de CPU del momento; la tendencia es la que importa."
+    : "Todavía sin línea de base: los valores son la suma cruda en milisegundos, no comparables. "
+      + "Se fija sola cuando hay suficientes sondas.";
+  $("leyenda-indice").innerHTML =
+    `<span><i class="muestra" style="background:var(--tinta-muda)"></i>lectura</span>
+     <span><i class="muestra" style="background:var(--serie-1)"></i>tendencia (mediana)</span>`;
+
+  const rm = s.sistema.map(p => ({ x: p.ts,
+    y: p.ram_total ? (p.ram_total - p.ram_disponible) / p.ram_total * 100 : null }))
+    .filter(p => p.y != null);
+  const cm = s.sistema.map(p => ({ x: p.ts,
+    y: p.commit_limite ? p.commit_total / p.commit_limite * 100 : null }))
+    .filter(p => p.y != null);
+  grafico("graf-memoria", [
+    { nombre: "RAM en uso %", color: "var(--serie-1)", puntos: rm },
+    { nombre: "commit %", color: "var(--serie-2)", puntos: cm },
+  ], { formato: (v) => v.toFixed(0) + "%", yMin: 0, yMax: 100, corte: s.corte,
+       aria: "presión de memoria en el tiempo" });
+
+  $("tabla-indice").innerHTML = crudos.length
+    ? tablaDeSeries([{ nombre: hayBase ? "índice" : "ms crudos", puntos: crudos },
+                     { nombre: "tendencia", puntos: med }],
+                    hayBase ? (v) => v.toFixed(3) : (v) => v.toFixed(1) + " ms")
+    : '<div class="vacio">Sin datos.</div>';
+  $("tabla-memoria").innerHTML = rm.length
+    ? tablaDeSeries([{ nombre: "RAM en uso %", puntos: rm },
+                     { nombre: "commit %", puntos: cm }], (v) => v.toFixed(1) + "%")
+    : '<div class="vacio">Sin datos.</div>';
+}
+
+async function refrescar() {
+  try {
+    const r = await fetch("/api/estado");
+    ultimo = await r.json();
+    pintar(ultimo);
+    await traerSerie();
+  } catch (e) {
+    $("latido").className = "punto muerto";
+    $("txt-latido").textContent = "sin conexión";
+  }
+}
+
+async function accion(url, btn) {
+  const texto = btn.textContent;
+  btn.disabled = true; btn.textContent = "…";
+  try {
+    const r = await fetch(url, { method: "POST" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) alert((j.detail || "Falló") + "");
+    await refrescar();
+  } catch (e) { alert("Error de red: " + e); }
+  finally { btn.disabled = false; btn.textContent = texto; }
+}
+
+document.querySelectorAll("[data-modo]").forEach(b =>
+  b.addEventListener("click", () => {
+    if (!confirm(`¿Pasar a modo ${b.dataset.modo}?` +
+      (b.dataset.modo === "activo" ? "\n\nEn modo activo el agente va a tocar memoria de verdad." : "")))
+      return;
+    accion(`/api/modo/${b.dataset.modo}`, b);
+  }));
+$("btn-calibrar").addEventListener("click", (e) => {
+  if (confirm("Mide cuánto cuesta vaciar un working set.\nLevanta un proceso de prueba por unos segundos."))
+    accion("/api/calibrar", e.target);
+});
+$("btn-entrenar").addEventListener("click", (e) => {
+  if (confirm("Entrena el modelo con los trims ya evaluados.\nNo toca memoria."))
+    accion("/api/entrenar", e.target);
+});
+document.querySelectorAll(".btn-tabla").forEach(b =>
+  b.addEventListener("click", () => {
+    const t = $("tabla-" + b.dataset.tabla);
+    const oculto = t.classList.toggle("oculto");
+    b.textContent = oculto ? "Ver tabla" : "Ocultar tabla";
+  }));
+
+refrescar();
+setInterval(refrescar, 5000);
+</script>
+</body>
+</html>
