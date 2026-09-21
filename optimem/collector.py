@@ -392,6 +392,14 @@ class Recolector:
 
         log.info("Recolector iniciado. Datos en %s", self.cfg.dir)
         log.info("Capacidades: %s", winapi.detectar_capacidades().detalle)
+
+        # El agente tiene logger propio de modulo y quedaba en None, asi que un
+        # fallo de prediccion (por ejemplo, un modelo con features de otro
+        # orden) desaparecia sin dejar rastro: el agente simplemente no hacia
+        # nada y parecia que estaba sano. Se lo pasamos recien aca, cuando el
+        # log ya existe: en __init__ todavia es None.
+        from . import agent as _agente
+        _agente.log = log
         db.registrar_evento(self.con, "inicio", "info", detalle="recolector")
         self._sonda_proc = None
         self._arrancar_sonda()
