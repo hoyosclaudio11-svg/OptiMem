@@ -105,8 +105,17 @@ def _umbral_optimo(y_true, y_prob) -> tuple[float, dict]:
                       "positivos": int(pred.sum())})
         # Criterio: recall maximo con precision >= 0.5; si ninguno llega,
         # el mejor F1.
+        #
+        # En empate de recall se prefiere el umbral MAS ALTO, o sea la mayor
+        # precision. Con el desempate al reves (quedarse con el primero) el
+        # ganador es siempre el umbral mas bajo de la grilla, que bloquea de
+        # mas sin ganar recall. Y hay un efecto peor: el agente bloquea todo
+        # lo que supere el umbral, asi que un umbral por debajo de
+        # umbral_seguridad deja la rama de prioridad inalcanzable y la zona
+        # gris nunca se usa.
         if p >= 0.5:
-            if mejor[1] is None or r > mejor[1]["recall"]:
+            if (mejor[1] is None or r > mejor[1]["recall"]
+                    or (r == mejor[1]["recall"] and p > mejor[1]["precision"])):
                 mejor = (float(u), {"precision": float(p), "recall": float(r),
                                     "f1": float(f)})
     if mejor[1] is None:
