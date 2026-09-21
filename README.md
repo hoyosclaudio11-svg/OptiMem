@@ -368,12 +368,36 @@ excelente, y que no tenía nada que ver con lo que decía medir. Los scripts de
 | Sonda de tiempo de respuesta | Funcionando, con línea de base automática |
 | Detección de procesos críticos | Funcionando — 6 categorías + vigilancia de crash loops |
 | Agente de ajuste en tiempo real | Funcionando — 3 modos, límites por hora |
-| Modelo de predicción | Circuito completo; **falta juntar muestras para entrenar** |
+| Modelo de predicción | **Entrenado y decidiendo** — `random_forest`, umbral 0,40 (21/09/2026) |
 | Panel web | Funcionando |
 | Informe de mejora | Funcionando |
 
-El modelo necesita ~60 trims etiquetados. En modo aprendizaje se juntan a razón
-de ~12 por hora, así que son unas 6 horas de recolección.
+### El primer entrenamiento
+
+125 trims etiquetados, 76 de los cuales causaron thrash. El corte es por tiempo
+—el pasado entrena, el futuro evalúa—: 93 muestras para entrenar, 32 para
+evaluar. Sobre ese futuro el modelo eligió `random_forest` con umbral 0,40:
+
+|  | predijo bueno | predijo malo |
+|---|---|---|
+| **era bueno** | 12 | 0 |
+| **era malo** | 0 | 20 |
+
+La regla tonta —trimear siempre— acertaría el 37,5% de las veces. Con 32
+muestras de evaluación esto es orientativo y no un resultado firme: hace falta
+un orden más de datos para que el número sea serio.
+
+Las primeras decisiones en vivo, ya en modo `activo`, fueron trims elegidos con
+P(thrash) entre 0,16 y 0,26 (`code-sidecar.exe` 264,7 MB, `claude.exe`,
+`msedgewebview2.exe`) en vez de sobre los procesos grandes que el modelo frena.
+El etiquetador cerró el primero como **sin thrash**, con una reincidencia de
+1,51x su tasa base de fallos: por debajo del umbral de 2,0 con el que el propio
+etiquetador decide que un trim causó thrash, pero no gratis — el proceso pagó un
+51% más de fallos por las páginas que tuvo que volver a traer.
+
+Lo que el agente decide se puede ver sin esperar: `validacion/probar_ciclo_agente.py`
+muestra qué haría en este momento, y `validacion/umbral_y_zona_gris.py` por qué
+corta donde corta.
 
 ---
 

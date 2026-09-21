@@ -140,6 +140,68 @@ alto acá no significa nada.
 
 ---
 
+## `umbral_y_zona_gris.py`
+
+**Cómo se elige el umbral de decisión, y qué se juega en ese número.** El agente
+bloquea todo trim cuya P(thrash) supere el umbral, así que el umbral no es
+calibración: es política. Define cuántas acciones se hacen.
+
+El script imprime la probabilidad que el modelo activo le asigna a cada muestra
+de su test temporal y qué pasaría con cada umbral de la grilla. Dos resultados
+del 21/09/2026:
+
+- Con las primeras 125 etiquetas la separación era amplia (malos ≥ 0,698, buenos
+  ≤ 0,388), así que cualquier umbral entre 0,40 y 0,69 daba la misma matriz de
+  confusión. Lo que decidía cuántos trims buenos se sacrificaban era **el
+  desempate**: el viejo se quedaba con el primer umbral que alcanzaba el recall
+  máximo, elegía 0,05, bloqueaba 26 de 32 muestras y perdía la mitad de los
+  trims buenos **sin ganar un solo bloqueo**. Ahora, en empate de recall, gana el
+  umbral más alto.
+- Con las etiquetas que llegaron después, el criterio elige 0,30, **por debajo
+  de `umbral_seguridad` (0,35)**: la rama de prioridad no se alcanza nunca y el
+  agente queda binario, sin usar la palanca suave que el diseño previó. Forzarlo
+  a la zona gris tampoco sale gratis: el trim con P = 0,31 que ese umbral bloquea
+  **sí causó thrash**. La tensión queda anotada, sin resolver.
+
+---
+
+## `probar_ciclo_agente.py`
+
+**Qué haría el agente en este momento, sin que lo haga.** Arma el mismo ciclo que
+el recolector corre cada 30 s —presión, candidatos, features, predicción— sobre
+la última foto real de procesos, y muestra la decisión que saldría para cada uno.
+Es de solo lectura.
+
+Existe porque el agente puede quedarse mudo **sin estar roto**, y desde afuera
+los tres motivos se ven igual —nada—:
+
+| motivo del silencio | deja rastro |
+|---|---|
+| no hay presión de memoria | no, y es lo correcto |
+| el presupuesto de MB de la hora se agotó | **no** — saltea el candidato sin registrar nada |
+| el modelo bloquea a todos | eventos `decision_frenada` |
+
+El segundo es el que engaña. El presupuesto lo comparten el agente y los trims
+exploratorios del modo aprendizaje, así que después de una hora de aprendizaje
+puede quedar en 0 MB y el agente parece apagado hasta que los trims viejos salen
+de la ventana de una hora. Salida real en ese estado:
+
+```
+  presupuesto : 14 acciones y 0 MB en la hora
+  candidatos  : 15 (>= 120 MB, sin cooldown)
+  ...
+  resumen: 0 bloqueados, 0 trims, 0 prioridad, 15 sin presupuesto
+
+  El agente no puede hacer NADA con 14 acciones libres:
+  el candidato mas chico pesa mas que los 0 MB que quedan en la hora.
+```
+
+Qué no prueba: usa la última foto de la base, no el estado en memoria del
+recolector, así que sirve para ver el criterio del modelo y no para auditarlo.
+Lo que el recolector decidió de verdad queda en `acciones` y `eventos`.
+
+---
+
 ## `probar_panel.py`
 
 Los endpoints del panel: que respondan, que devuelvan las claves esperadas y que
